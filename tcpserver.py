@@ -16,3 +16,17 @@ if __name__ == "__main__":
         print('use: tcpserver <file> <listening_port> ' \
               '<address_for_acks> <port_for_acks>')
         sys.exit()
+    
+    serverSocket = socket(AF_INET, SOCK_DGRAM)
+    serverSocket.bind(('', int(listening_port)))
+    # TODO: only one client at a time
+    while True:
+        message, clientAddress = serverSocket.recvfrom(2048)
+        modifiedMessage = message.decode()
+        print('Handled client: ' + str(clientAddress)+ ' who sent: ' +
+              message.decode())
+        
+    # receiver sends acknowledgments directly to the sender
+
+    # the server receives data on the listening_port, writes it to the file file 
+    # sends ACKs to ip_address_for_acks, port port_for_acks
