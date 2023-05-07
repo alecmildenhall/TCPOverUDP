@@ -13,7 +13,7 @@ def decode_binary(len_header_string):
     rec_len = 20
     is_ack = False
     is_syn = False
-    is_fyn = False
+    is_fin = False
 
     len_header_bin = bin(len_header_string)
 
@@ -22,27 +22,27 @@ def decode_binary(len_header_string):
     if (int(len_header_bin[-2: -1])):
         is_syn = True
     if (int(len_header_bin[-1:])):
-        is_fyn = True
+        is_fin = True
 
-    return rec_len, is_ack, is_syn, is_fyn
+    return rec_len, is_ack, is_syn, is_fin
 
 def unpack_header(message):
     unpacked = struct.unpack('h h i i h h h h', message)
     rec_seq = unpacked[2]
     rec_ack = unpacked[3]
-    rec_len, is_ack, is_syn, is_fyn = decode_binary(unpacked[4])
+    rec_len, is_ack, is_syn, is_fin = decode_binary(unpacked[4])
     rec_windowsize = unpacked[5]
     rec_checksum = unpacked[6]
 
-    return rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fyn, rec_windowsize, rec_checksum
+    return rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum
 
 
-def set_flags(header_len, is_ack, is_syn, is_fyn):
+def set_flags(header_len, is_ack, is_syn, is_fin):
     ack_flag = 0b010000 if is_ack else 0
     syn_flag = 0b000010 if is_syn else 0
-    fyn_flag = 0b000001 if is_fyn else 0
+    fin_flag = 0b000001 if is_fin else 0
 
-    flag_and_len_as_int = (header_len << 12) | syn_flag | ack_flag | fyn_flag
+    flag_and_len_as_int = (header_len << 12) | syn_flag | ack_flag | fin_flag
     return flag_and_len_as_int
 
 if __name__ == "__main__":
@@ -86,9 +86,9 @@ if __name__ == "__main__":
                     print("header: " + str(header))
                     data = bytes_read[20:]
                     print("data: " + str(data))
-                    rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fyn, rec_windowsize, rec_checksum = unpack_header(header)
-                    if(is_fyn):
-                        # received FYN request
+                    rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum = unpack_header(header)
+                    if(is_fin):
+                        # received FIN request
                         f.close()
                         print('closed')
                         handshake_complete = False
@@ -102,13 +102,13 @@ if __name__ == "__main__":
         # 3 way handshake
         else:
             message, clientAddress = serverSocket.recvfrom(20)
-            rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fyn, rec_windowsize, rec_checksum = unpack_header(message)
+            rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum = unpack_header(message)
 
             # if SYN segment, send SYNACK segment
             if(is_syn):
                 print('SYN segment received')
                 ack_num = rec_seq + 1
-                flag_and_len_as_int = set_flags(header_len, is_ack, is_syn, is_fyn)
+                flag_and_len_as_int = set_flags(header_len, is_ack, is_syn, is_fin)
                 # TODO: allocate buffers and vars for connection
                 SYNACK_segment = struct.pack("h h i i h h h h", int(listening_port), int(port_for_acks),
                                 server_isn, ack_num, flag_and_len_as_int, 0,
