@@ -3,6 +3,8 @@
 from socket import *
 import sys
 import struct
+import os
+import errno
 
 MAX_SEGMENT_SIZE = 576
 
@@ -24,7 +26,7 @@ def decode_binary(len_header_string):
 
     return rec_len, is_ack, is_syn, is_fyn
 
-def unpack_segment(message):
+def unpack_header(message):
     unpacked = struct.unpack('h h i i h h h h', message)
     rec_seq = unpacked[2]
     rec_ack = unpacked[3]
@@ -33,6 +35,7 @@ def unpack_segment(message):
     rec_checksum = unpacked[6]
 
     return rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fyn, rec_windowsize, rec_checksum
+
 
 def set_flags(header_len, is_ack, is_syn, is_fyn):
     ack_flag = 0b010000 if is_ack else 0
@@ -58,44 +61,70 @@ if __name__ == "__main__":
     
     serverSocket = socket(AF_INET, SOCK_DGRAM)
     serverSocket.bind(('', int(listening_port)))
+    
     # TODO: only one client at a time
+    header_len = 0b0101
     server_isn = 0
     handshake_complete = False
-    header_len = 0b0101
+
+    # receive packets
     while True:
-        # TODO: change size?
-        message, clientAddress = serverSocket.recvfrom(2048)
-        unpacked = struct.unpack('h h i i h h h h', message)
-        print("lvl 1 unpacked (should be SYN): " + str(unpacked))
-        # unpacked: (source port, dest port, seq num, ack num,
-        #            header len + flags, window, checksum, urgent)
-        rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fyn, rec_windowsize, rec_checksum = unpack_segment(message)
+        print('at start')
+        if (handshake_complete):
+            print('post handshake')
 
-        # if SYN segment, send SYNACK segment
-        if(is_syn):
-            print('SYN segment received')
-            server_isn = 0
-            ack_num = rec_seq + 1
-            flag_and_len_as_int = set_flags(header_len, is_ack, is_syn, is_fyn)
-            # TODO: allocate buffers and vars for connection
-            SYNACK_segment = struct.pack("h h i i h h h h", int(listening_port), int(port_for_acks),
-                               server_isn, ack_num, flag_and_len_as_int, 0,
-                               0, 0)
-            serverSocket.sendto(SYNACK_segment, (address_for_acks, int(port_for_acks)))
-            print('sent SYNACK_segment')
+            # write to file
+            with open(file_name, "wb") as f:
+                flag = 0
+                while True:
+                    print('in true')
+                    print('before receive')
 
-            # complete handshake
-            message, clientAddress = serverSocket.recvfrom(2048)
-            unpacked = struct.unpack('h h i i h h h h', message)
-            print("complete handshake segment: " + str(unpacked))
-            handshake_complete = True
+                    # receive packet
+                    bytes_read = serverSocket.recv(MAX_SEGMENT_SIZE + 20)
+                    header = bytes_read[:20]
+                    print("header: " + str(header))
+                    data = bytes_read[20:]
+                    print("data: " + str(data))
+                    rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fyn, rec_windowsize, rec_checksum = unpack_header(header)
+                    if(is_fyn):
+                        # received FYN request
+                        f.close()
+                        print('closed')
+                        handshake_complete = False
+                        break
+                    else:
+                        # file data
+                        unpacked = struct.unpack('h h i i h h h h', header)
+                        print("unpacked: " + str(unpacked))
+                        f.write(data)
         
-        elif(handshake_complete):
-            while True:
-                # receive transmission of packets
-                pass
+        # 3 way handshake
         else:
-            print('Error: three-way handshake must be setup first')
+            message, clientAddress = serverSocket.recvfrom(20)
+            rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fyn, rec_windowsize, rec_checksum = unpack_header(message)
+
+            # if SYN segment, send SYNACK segment
+            if(is_syn):
+                print('SYN segment received')
+                ack_num = rec_seq + 1
+                flag_and_len_as_int = set_flags(header_len, is_ack, is_syn, is_fyn)
+                # TODO: allocate buffers and vars for connection
+                SYNACK_segment = struct.pack("h h i i h h h h", int(listening_port), int(port_for_acks),
+                                server_isn, ack_num, flag_and_len_as_int, 0,
+                                0, 0)
+                serverSocket.sendto(SYNACK_segment, (address_for_acks, int(port_for_acks)))
+                print('sent SYNACK_segment')
+
+                # complete handshake
+                message, clientAddress = serverSocket.recvfrom(20)
+                unpacked = struct.unpack('h h i i h h h h', message)
+                print("complete handshake segment: " + str(unpacked))
+                handshake_complete = True
+        
+            else:
+                print('Error: three-way handshake must be setup first')
+                continue
 
 
 
