@@ -55,17 +55,18 @@ def getChecksum(packet):
         num_chunks = num_chunks + 1
     start = 0
     iterations = int(num_chunks) - 1
-    checksum = packet[:16]
+    checksum = int(packet[:2])
     while(iterations):
-        start = start + 16
-        end = start + 16
+        start = start + 2
+        end = start + 2
         if (end < len(packet)):
             chunk = packet[start:end]
         else:
             chunk = packet[start:]
         checksum = int(checksum) ^ int(chunk)
         iterations = iterations - 1
-    checksum = bin(checksum)
+    #checksum = bin(checksum)
+    return bin(checksum)
 
 if __name__ == "__main__":
 
