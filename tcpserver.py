@@ -133,6 +133,11 @@ if __name__ == "__main__":
                     else:
                         # file data received
                         unpacked = struct.unpack('h h i i h h h h', header)
+
+                        # check for file corruption
+                        if (rec_checksum != 0):
+                            print('data corruption')
+
                         # send ACK
                         # switch ack and seq nums for stop and wait implementation
                         flag_and_len_as_int = set_flags(header_len, True, False, False)

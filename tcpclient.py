@@ -46,6 +46,27 @@ def set_flags(header_len, is_ack, is_syn, is_fin):
     return flag_and_len_as_int
 
 
+def getChecksum(packet):
+    return 0
+
+    # below implementation work in progress
+    num_chunks = len(packet) / 16
+    if (len(packet) % 16 != 0):
+        num_chunks = num_chunks + 1
+    start = 0
+    iterations = int(num_chunks) - 1
+    checksum = packet[:16]
+    while(iterations):
+        start = start + 16
+        end = start + 16
+        if (end < len(packet)):
+            chunk = packet[start:end]
+        else:
+            chunk = packet[start:]
+        checksum = int(checksum) ^ int(chunk)
+        iterations = iterations - 1
+    checksum = bin(checksum)
+
 if __name__ == "__main__":
 
     # take command line arguments
@@ -133,9 +154,13 @@ if __name__ == "__main__":
             # send packet
             format = "h h i i h h h h " + str(len(bytes_read)) + "s"
             flag_and_len_as_int = set_flags(header_len, False, False, False)
-            packet = struct.pack(format, int(ack_port_number), int(port_number_of_udpl),
+            check_packet = struct.pack(format, int(ack_port_number), int(port_number_of_udpl),
                                seq_num, ack_num, flag_and_len_as_int, 0,
                                0, 0, bytes_read) 
+            checksum = getChecksum(check_packet)
+            packet = struct.pack(format, int(ack_port_number), int(port_number_of_udpl),
+                               seq_num, ack_num, flag_and_len_as_int, 0,
+                               checksum, 0, bytes_read) 
             
             
             clientSocket.sendto(packet,(address_of_udpl, int(port_number_of_udpl)))
