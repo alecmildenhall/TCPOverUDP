@@ -70,27 +70,21 @@ if __name__ == "__main__":
 
     # receive packets
     while True:
-        print('at start')
         if (handshake_complete):
 
             # initialized ack and seq nums for stop n wait protocol
             ack_num = 0
             seq_num = 1
-            print('post handshake')
 
             # write to file
             with open(file_name, "wb") as f:
                 flag = 0
                 while True:
-                    print('in true')
-                    print('before receive')
 
                     # receive packet
                     bytes_read = serverSocket.recv(MAX_SEGMENT_SIZE + 20)
                     header = bytes_read[:20]
-                    print("header: " + str(header))
                     data = bytes_read[20:]
-                    print("data: " + str(data))
                     rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum = unpack_header(header)
                     if(is_fin):
                         # received FIN request
@@ -99,7 +93,6 @@ if __name__ == "__main__":
                         ack_packet = struct.pack("h h i i h h h h", int(listening_port), int(port_for_acks),
                                 rec_ack, rec_seq, flag_and_len_as_int, 0,
                                 0, 0)
-                        print('sending ACK after FIN')
                         # send ACK
                         serverSocket.sendto(ack_packet, (address_for_acks, int(port_for_acks)))
 
@@ -107,18 +100,15 @@ if __name__ == "__main__":
                         while True:
                             flag_and_len_as_int = set_flags(header_len, False, False, True)
                             # switch seq and ack num
-                            print('sending FIN')
                             fin_packet = struct.pack("h h i i h h h h", int(listening_port), int(port_for_acks),
                                     rec_seq, rec_ack, flag_and_len_as_int, 0,
                                     0, 0)
                             serverSocket.sendto(fin_packet, (address_for_acks, int(port_for_acks)))
 
                             # receive ack
-                            print('receiving ACK')
                             serverSocket.settimeout(1)
                             try:
                                 message = serverSocket.recv(20) # ERROR: blocking here
-                                print(message)
                                 rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum = unpack_header(message)
                                 if (not is_ack):
                                     print('Error: final ACK not received') 
@@ -137,21 +127,18 @@ if __name__ == "__main__":
                                     0, 0)
 
                         f.close()
-                        print('closed')
                         handshake_complete = False
                         serverSocket.settimeout(None)
                         break
                     else:
                         # file data received
                         unpacked = struct.unpack('h h i i h h h h', header)
-                        print("unpacked: " + str(unpacked))
                         # send ACK
                         # switch ack and seq nums for stop and wait implementation
                         flag_and_len_as_int = set_flags(header_len, True, False, False)
                         ack_packet = struct.pack("h h i i h h h h", int(listening_port), int(port_for_acks),
                                 rec_ack, rec_seq, flag_and_len_as_int, 0,
                                 0, 0)
-                        print('sending ACK')
                         # send ACK
                         serverSocket.sendto(ack_packet, (address_for_acks, int(port_for_acks)))
                         
@@ -165,38 +152,20 @@ if __name__ == "__main__":
 
             # if SYN segment, send SYNACK segment
             if(is_syn):
-                print('SYN segment received')
                 ack_num = rec_seq + 1
                 flag_and_len_as_int = set_flags(header_len, is_ack, is_syn, is_fin)
-                # TODO: allocate buffers and vars for connection
                 SYNACK_segment = struct.pack("h h i i h h h h", int(listening_port), int(port_for_acks),
                                 server_isn, ack_num, flag_and_len_as_int, 0,
                                 0, 0)
                 serverSocket.sendto(SYNACK_segment, (address_for_acks, int(port_for_acks)))
-                print('sent SYNACK_segment')
 
                 # complete handshake
                 message, clientAddress = serverSocket.recvfrom(20)
                 unpacked = struct.unpack('h h i i h h h h', message)
-                print("complete handshake segment: " + str(unpacked))
                 handshake_complete = True
         
             else:
                 print('Error: three-way handshake must be setup first')
                 unpacked = struct.unpack('h h i i h h h h', message)
-                print("message received: " + str(unpacked))
                 rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum = unpack_header(message)
-                print(is_ack)
-                print(is_syn)
-                print(is_fin)
                 continue
-
-
-
-        
-    # receiver sends acknowledgments directly to the sender
-
-    # the server receives data on the listening_port, writes it to the file file 
-    # sends ACKs to ip_address_for_acks, port port_for_acks
-
-    # randomly chose initial seq # (see page 233)

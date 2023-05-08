@@ -78,23 +78,22 @@ if __name__ == "__main__":
     SYN_segment = struct.pack("h h i i h h h h", int(ack_port_number), int(port_number_of_udpl),
                                client_isn, 0, flag_and_len_as_int, 0,
                                0, 0)
-    
-    # send SYN segment
-    clientSocket.sendto(SYN_segment,(address_of_udpl, int(port_number_of_udpl)))
-
-    # receive SYNACK segment
     clientSocket.settimeout(1)
-    try:
-        serverMessage, serverAddress = clientSocket.recvfrom(20)
-    except socket.timeout:
-        print('Error: timed out before ACK received')
-        print('Restart client to request again')
-        clientSocket.close()
-        sys.exit()
+    success = False
+    while(True):
+        # send SYN segment
+        clientSocket.sendto(SYN_segment,(address_of_udpl, int(port_number_of_udpl)))
+
+        # receive SYNACK segment
+        try:
+            serverMessage, serverAddress = clientSocket.recvfrom(20)
+        except socket.timeout:
+            print('Error: timed out before ACK received')
+            print('Restart client to request again')
+            continue
+        break
 
 
-    unpacked = struct.unpack('h h i i h h h h', serverMessage)
-    print("SYNACK received: " + str(unpacked))
     rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum = unpack_header(serverMessage)
 
     # finish handshake
@@ -167,14 +166,7 @@ if __name__ == "__main__":
                     print("Retransmitting packet")
                     clientSocket.sendto(packet,(address_of_udpl, int(port_number_of_udpl)))
 
-
-            # successfully received ACK
-            print("received ACK:")
-            unpacked = struct.unpack('h h i i h h h h', ackMessage)
-            print(unpacked)
-
     # send FIN request
-    print('sending FIN request')
     flag_and_len_as_int = set_flags(header_len, False, False, True)
     packet = struct.pack("h h i i h h h h", int(ack_port_number), int(port_number_of_udpl),
                                seq_num, ack_num, flag_and_len_as_int, 0,
@@ -184,15 +176,12 @@ if __name__ == "__main__":
     # wait for ACK
     flag = 0
     while True:
-        print('waiting for ACK')
         try:
             ackMessage, serverAddress = clientSocket.recvfrom(20)
             rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum = unpack_header(ackMessage)
             if(is_ack):
-                print('is_ack')
                 # correct ACK received
                 if(rec_ack == seq_num):
-                    print('correct ACK received (post FIN)')
                     # switch seq and ack num
                     seq_num, ack_num = ack_num, seq_num
                     flag = 1
@@ -217,9 +206,7 @@ if __name__ == "__main__":
 
 
     # wait for FIN request from server
-    # TODO: put in function?
     while True:
-        print('waiting for FIN')
         try:
             finMessage, serverAddress = clientSocket.recvfrom(20)
             rec_seq, rec_ack, rec_len, is_ack, is_syn, is_fin, rec_windowsize, rec_checksum = unpack_header(finMessage)
@@ -238,8 +225,6 @@ if __name__ == "__main__":
                 print('Error: non ACK packet received')
                 print("Retransmitting fin packet")
                 # TODO: error here
-                unpacked = struct.unpack('h h i i h h h h', finMessage)
-                print(unpacked)
                 clientSocket.sendto(packet,(address_of_udpl, int(port_number_of_udpl)))
                 sys.exit()
         except socket.timeout:
@@ -255,13 +240,12 @@ if __name__ == "__main__":
         ack_packet = struct.pack("h h i i h h h h", int(ack_port_number), int(port_number_of_udpl),
                                 rec_ack, rec_seq, flag_and_len_as_int, 0,
                                 0, 0)
-        print('send ACK')
         clientSocket.sendto(ack_packet,(address_of_udpl, int(port_number_of_udpl)))
 
-        # wait 30 seconds
+        # wait 10 seconds
         # resend final ACK in case gets lost (if recv fin from server)
         clientSocket.settimeout(10)
-    #while True:
+
         try:
             message, serverAddress = clientSocket.recvfrom(20)
             # resend final acknowledgement (ACK is lost)
@@ -269,14 +253,5 @@ if __name__ == "__main__":
             clientSocket.sendto(ack_packet,(address_of_udpl, int(port_number_of_udpl)))
 
         except socket.timeout:
-            print('closing socket')
             clientSocket.close()
             break
-
-    # sender sends packets to the emulator, which forwards them to the receiver
-
-    # reads data from the specified file, sends it to the emulator's address and port, 
-    # and receives acknowledgments on the ack_port_number
-    # window size is measured in bytes and can be set to any reasonable default value
-
-    # randomly chose initial seq # (see page 233)
