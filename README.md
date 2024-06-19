@@ -1,9 +1,4 @@
 # README
-apm2189
-4 late days used
-- 4 extra late days were granted by the professor
-- can show email for proof if needed
-
 This program is a simplified version of the Transmission Control Protocol (TCP) that operates over User Datagram Protocol (UDP). 
 
 ### Requirements:
